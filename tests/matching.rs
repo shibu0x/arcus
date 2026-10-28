@@ -24,6 +24,11 @@ fn buy_fully_fills_sell_order() {
     assert_eq!(trade.price(), to_price(99.0));
     assert_eq!(trade.quantity(), 5);
     assert_eq!(trade.side(), Side::Buy);
+    assert!(
+        book.validate().is_ok(),
+        "Order book invariant violation: {:?}",
+        book.validate()
+    );
 }
 
 #[test]
@@ -45,6 +50,11 @@ fn buy_partially_fills_sell_order() {
     assert_eq!(trade.price(), to_price(99.0));
     assert_eq!(trade.quantity(), 4);
     assert_eq!(trade.side(), Side::Buy);
+    assert!(
+        book.validate().is_ok(),
+        "Order book invariant violation: {:?}",
+        book.validate()
+    );
 }
 
 #[test]
@@ -70,6 +80,11 @@ fn buy_does_not_cross_above_its_limit() {
         book.get_mut(to_price(100.0), Side::Buy).unwrap()[0].quantity(),
         3
     );
+    assert!(
+        book.validate().is_ok(),
+        "Order book invariant violation: {:?}",
+        book.validate()
+    );
 }
 
 #[test]
@@ -93,6 +108,11 @@ fn sell_matches_best_bid() {
     assert_eq!(trade.price(), to_price(100.0));
     assert_eq!(trade.quantity(), 3);
     assert_eq!(trade.side(), Side::Sell);
+    assert!(
+        book.validate().is_ok(),
+        "Order book invariant violation: {:?}",
+        book.validate()
+    );
 }
 
 #[test]
@@ -122,6 +142,11 @@ fn buy_matches_multiple_price_levels() {
         1
     );
     assert_eq!(book.best_bid(), None);
+    assert!(
+        book.validate().is_ok(),
+        "Order book invariant violation: {:?}",
+        book.validate()
+    );
 }
 
 #[test]
@@ -147,6 +172,11 @@ fn matches_orders_in_fifo_order_at_same_price() {
 
     assert_eq!(remaining_orders.len(), 1);
     assert_eq!(remaining_orders[0].quantity(), 5);
+    assert!(
+        book.validate().is_ok(),
+        "Order book invariant violation: {:?}",
+        book.validate()
+    );
 }
 
 #[test]

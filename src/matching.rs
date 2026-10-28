@@ -29,8 +29,6 @@ pub fn match_buy(order: &mut Order, orderbook: &mut OrderBook, trade_history: &m
             break;
         }
 
-        let mut level_empty = false;
-
         if let Some(orders) = orderbook.get_mut(best_ask, Side::Sell) {
             if let Some(resting_order) = orders.first_mut() {
                 let traded = order.quantity().min(resting_order.quantity());
@@ -38,7 +36,7 @@ pub fn match_buy(order: &mut Order, orderbook: &mut OrderBook, trade_history: &m
                 order.reduce_quantity(traded);
                 resting_order.reduce_quantity(traded);
 
-                let trade = Trade::new(best_ask,traded,order.side());
+                let trade = Trade::new(best_ask, traded, order.side());
 
                 trade_history.add(trade);
             }
@@ -46,12 +44,12 @@ pub fn match_buy(order: &mut Order, orderbook: &mut OrderBook, trade_history: &m
             if orders.first().is_some_and(|o| o.quantity() == 0) {
                 orders.remove(0);
             }
-
-            level_empty = orders.is_empty();
-        }
-
-        if level_empty {
+            if orders.is_empty() {
+                orderbook.remove(best_ask, Side::Sell);
+            }
+        } else {
             orderbook.remove(best_ask, Side::Sell);
+            continue;
         }
     }
 }
@@ -66,8 +64,6 @@ pub fn match_sell(order: &mut Order, orderbook: &mut OrderBook, trade_history: &
             break;
         }
 
-        let mut level_empty = false;
-
         if let Some(orders) = orderbook.get_mut(best_bid, Side::Buy) {
             if let Some(resting_order) = orders.first_mut() {
                 let traded = order.quantity().min(resting_order.quantity());
@@ -75,7 +71,7 @@ pub fn match_sell(order: &mut Order, orderbook: &mut OrderBook, trade_history: &
                 order.reduce_quantity(traded);
                 resting_order.reduce_quantity(traded);
 
-                let trade = Trade::new(best_bid,traded,order.side());
+                let trade = Trade::new(best_bid, traded, order.side());
 
                 trade_history.add(trade);
             }
@@ -84,11 +80,12 @@ pub fn match_sell(order: &mut Order, orderbook: &mut OrderBook, trade_history: &
                 orders.remove(0);
             }
 
-            level_empty = orders.is_empty();
-        }
-
-        if level_empty {
+            if orders.is_empty() {
+                orderbook.remove(best_bid, Side::Buy);
+            }
+        } else {
             orderbook.remove(best_bid, Side::Buy);
+            continue;
         }
     }
 }
