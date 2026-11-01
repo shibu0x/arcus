@@ -1,29 +1,26 @@
-use arcus::{
-    matching::matching_engine,
-    order::{Order, Side},
-    order_book::OrderBook,
-    trade::TradeHistory,
-    price::to_price,
-};
+use arcus::{engine::Engine, order::Side, price::to_price};
 
 fn main() {
-    let mut book = OrderBook::new();
-    let mut history = TradeHistory::new();
+    let mut engine = Engine::new();
 
-    book.add(Order::new(to_price(99.0), Side::Sell, 5).unwrap());
+    engine.submit_limit_order(to_price(99.0), Side::Sell, 5).unwrap();
+    engine.submit_limit_order(to_price(100.0), Side::Buy, 8).unwrap();
 
-    matching_engine(
-        Order::new(to_price(100.0), Side::Buy, 5).unwrap(),
-        &mut book,
-        &mut history,
-    );
-
-    for trade in history.iter() {
+    for trade in engine.trades().iter() {
         println!(
-            "Trade: price={}, quantity={}, side={:?}",
+            "Trade {}: maker={} taker={} price={} qty={} side={:?}",
+            trade.id(),
+            trade.maker_id(),
+            trade.taker_id(),
             trade.price(),
             trade.quantity(),
             trade.side()
         );
     }
+
+    println!(
+        "best bid={:?} best ask={:?}",
+        engine.book().best_bid(),
+        engine.book().best_ask()
+    );
 }

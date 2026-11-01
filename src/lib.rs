@@ -1,4 +1,6 @@
-pub mod matching;
+pub mod error;
+pub mod engine;
+pub(crate) mod matching;
 pub mod order;
 pub mod order_book;
 pub mod price;

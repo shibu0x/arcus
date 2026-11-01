@@ -1,24 +1,51 @@
 use std::time::SystemTime;
 
-use crate::{order::Side, price::Price};
+use crate::{order::{OrderId, Side}, price::Price};
+
+pub type TradeId = u64;
 
 pub struct Trade {
+    id: TradeId,
     price: Price,
     quantity: u32,
     side: Side,
     time: SystemTime,
+    maker_id: OrderId,
+    taker_id: OrderId,
 }
 
 impl Trade {
-    pub fn new(price: Price, quantity: u32, side: Side) -> Self {
+    pub fn new(
+        id: TradeId,
+        price: Price,
+        quantity: u32,
+        side: Side,
+        maker_id: OrderId,
+        taker_id: OrderId,
+    ) -> Self {
         Self {
+            id,
             price,
             quantity,
             side,
             time: SystemTime::now(),
+            maker_id,
+            taker_id
         }
     }
-    
+
+    pub fn id(&self) -> TradeId {
+        self.id
+    }
+
+    pub fn maker_id(&self) -> OrderId {
+        self.maker_id
+    }
+
+    pub fn taker_id(&self) -> OrderId {
+        self.taker_id
+    }
+
     pub fn price(&self) -> Price {
         self.price
     }
