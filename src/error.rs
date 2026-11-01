@@ -5,6 +5,24 @@ use thiserror::Error;
 pub enum OrderError {
     #[error("order quantity must be greater than zero")]
     ZeroQuantity,
+
+    #[error("order price must be greater than zero")]
+    ZeroPrice,
+
+    #[error("price {price} is outside the allowed range {min}..={max}")]
+    PriceOutOfRange { price: Price, min: Price, max: Price },
+
+    #[error("price {price} is not a multiple of the tick size {tick_size}")]
+    OffTick { price: Price, tick_size: Price },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+pub enum ConfigError {
+    #[error("tick size must be greater than zero")]
+    ZeroTickSize,
+
+    #[error("price range {min}..={max} is invalid (min must be > 0 and <= max)")]
+    InvalidRange { min: Price, max: Price },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -23,7 +41,4 @@ pub enum BookError {
 
     #[error("crossed book: best bid {best_bid} >= best ask {best_ask}")]
     CrossedBook { best_bid: Price, best_ask: Price },
-
-    #[error("price can't me zero or negative")]
-    InvalidPrice
 }

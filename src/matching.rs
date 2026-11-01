@@ -1,7 +1,7 @@
 use crate::{
     order::{Order, Side},
     order_book::OrderBook,
-    trade::{Trade, TradeHistory, TradeId},
+    trade::{Timestamp, Trade, TradeHistory, TradeId},
 };
 
 pub fn matching_engine(
@@ -9,10 +9,11 @@ pub fn matching_engine(
     orderbook: &mut OrderBook,
     trade_history: &mut TradeHistory,
     next_trade_id: &mut TradeId,
+    timestamp: Timestamp,
 ) {
     match order.side() {
-        Side::Buy => match_buy(&mut order, orderbook, trade_history, next_trade_id),
-        Side::Sell => match_sell(&mut order, orderbook, trade_history, next_trade_id),
+        Side::Buy => match_buy(&mut order, orderbook, trade_history, next_trade_id, timestamp),
+        Side::Sell => match_sell(&mut order, orderbook, trade_history, next_trade_id, timestamp),
     }
 
     if order.quantity() > 0 {
@@ -24,6 +25,7 @@ pub fn match_buy(
     order: &mut Order,
     orderbook: &mut OrderBook, trade_history: &mut TradeHistory,
     next_trade_id: &mut TradeId,
+    timestamp: Timestamp,
 ) {
     while order.quantity() > 0 {
         let Some(best_ask) = orderbook.best_ask() else {
@@ -48,6 +50,7 @@ pub fn match_buy(
                     order.side(),
                     resting_order.id(),
                     order.id(),
+                    timestamp,
                 );
                 *next_trade_id += 1;
 
@@ -71,6 +74,7 @@ pub fn match_sell(
     order: &mut Order,
     orderbook: &mut OrderBook, trade_history: &mut TradeHistory,
     next_trade_id: &mut TradeId,
+    timestamp: Timestamp,
 ) {
     while order.quantity() > 0 {
         let Some(best_bid) = orderbook.best_bid() else {
@@ -95,6 +99,7 @@ pub fn match_sell(
                     order.side(),
                     resting_order.id(),
                     order.id(),
+                    timestamp,
                 );
                 *next_trade_id += 1;
 
