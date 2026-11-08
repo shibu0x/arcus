@@ -1,7 +1,7 @@
 use arcus::{
     config::Config,
     engine::Engine,
-    error::{ConfigError, OrderError},
+    error::{CancelError, ConfigError, OrderError},
     order::Side,
     price::PRICE_MULTIPLIER,
 };
@@ -64,4 +64,42 @@ fn bad_config_is_rejected() {
     assert_eq!(Config::new(0, 1, 10), Err(ConfigError::ZeroTickSize));
     assert_eq!(Config::new(1, 0, 10), Err(ConfigError::InvalidRange { min: 0, max: 10 }));
     assert_eq!(Config::new(1, 11, 10), Err(ConfigError::InvalidRange { min: 11, max: 10 }));
+}
+
+#[test]
+fn cancel_returns_open_quantity_and_removes_the_order() {
+    let mut engine = engine();
+    let id = engine.submit_limit_order(p(99), Side::Sell, 10, 0).unwrap();
+    engine.submit_limit_order(p(99), Side::Buy, 4, 0).unwrap(); // fills 4 of 10
+
+    assert_eq!(engine.cancel_order(id), Ok(6));
+    assert_eq!(engine.book().best_ask(), None);
+    assert!(engine.book().validate().is_ok());
+}
+
+#[test]
+fn cancel_unknown_filled_or_repeated_is_an_error() {
+    let mut engine = engine();
+    let maker = engine.submit_limit_order(p(99), Side::Sell, 5, 0).unwrap();
+    let resting = engine.submit_limit_order(p(98), Side::Buy, 5, 0).unwrap();
+    engine.submit_limit_order(p(99), Side::Buy, 5, 0).unwrap(); // fills `maker`
+
+    assert_eq!(engine.cancel_order(maker), Err(CancelError::UnknownOrder(maker)));
+    assert_eq!(engine.cancel_order(777), Err(CancelError::UnknownOrder(777)));
+    assert_eq!(engine.cancel_order(resting), Ok(5));
+    assert_eq!(engine.cancel_order(resting), Err(CancelError::UnknownOrder(resting)));
+}
+
+#[test]
+fn cancelled_order_no_longer_trades() {
+    let mut engine = engine();
+    let first = engine.submit_limit_order(p(99), Side::Sell, 5, 0).unwrap();
+    let second = engine.submit_limit_order(p(99), Side::Sell, 5, 0).unwrap();
+    engine.cancel_order(first).unwrap();
+    engine.submit_limit_order(p(99), Side::Buy, 5, 0).unwrap();
+
+    let trade = engine.trades().iter().next().unwrap();
+    assert_eq!(trade.maker_id(), second);
+    assert_eq!(engine.trades().len(), 1);
+    assert!(engine.book().validate().is_ok());
 }

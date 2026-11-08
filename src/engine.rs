@@ -1,6 +1,6 @@
 use crate::{
     config::Config,
-    error::OrderError,
+    error::{CancelError, OrderError},
     matching::matching_engine,
     order::{Order, OrderId, Side},
     order_book::OrderBook,
@@ -46,9 +46,20 @@ impl Engine {
 
         let id = self.next_order_id;
         let order = Order::new(id, price, side, qty)?;
+        if !self.book.has_room() {
+            return Err(OrderError::BookFull);
+        }
         self.next_order_id += 1;
 
         matching_engine(order, &mut self.book, &mut self.trades, &mut self.next_trade_id, timestamp);
         Ok(id)
+    }
+
+    /// Cancels a resting order and returns the quantity that was still open.
+    pub fn cancel_order(&mut self, id: OrderId) -> Result<u32, CancelError> {
+        self.book
+            .cancel(id)
+            .map(|order| order.quantity())
+            .ok_or(CancelError::UnknownOrder(id))
     }
 }

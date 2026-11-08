@@ -18,7 +18,7 @@ fn buy_fully_fills_sell_order() {
     let existing_order = Order::new(1, p(99), Side::Sell, 5).unwrap();
     let incoming_order = Order::new(2, p(100), Side::Buy, 5).unwrap();
 
-    book.add(existing_order);
+    book.add(existing_order).unwrap();
     matching_engine(incoming_order, &mut book, &mut trade_history, &mut 1, 0);
     let trade = trade_history.iter().next().unwrap();
 
@@ -43,10 +43,10 @@ fn buy_partially_fills_sell_order() {
     let existing_order = Order::new(3, p(99), Side::Sell, 10).unwrap();
     let incoming_order = Order::new(4, p(100), Side::Buy, 4).unwrap();
 
-    book.add(existing_order);
+    book.add(existing_order).unwrap();
     matching_engine(incoming_order, &mut book, &mut trade_history, &mut 1, 0);
     let trade = trade_history.iter().next().unwrap();
-    let asks = book.get_mut(p(99), Side::Sell).unwrap();
+    let asks = book.orders_at(p(99), Side::Sell);
 
     assert_eq!(asks[0].quantity(), 6);
     assert_eq!(book.best_ask(), Some(p(99)));
@@ -69,19 +69,19 @@ fn buy_does_not_cross_above_its_limit() {
     let existing_order = Order::new(5, p(110), Side::Sell, 5).unwrap();
     let incoming_order = Order::new(6, p(100), Side::Buy, 3).unwrap();
 
-    book.add(existing_order);
+    book.add(existing_order).unwrap();
 
     matching_engine(incoming_order, &mut book, &mut trade_history, &mut 1, 0);
 
     assert_eq!(book.best_ask(), Some(p(110)));
     assert_eq!(
-        book.get_mut(p(110), Side::Sell).unwrap()[0].quantity(),
+        book.orders_at(p(110), Side::Sell)[0].quantity(),
         5
     );
     assert_eq!(trade_history.len(), 0);
     assert_eq!(book.best_bid(), Some(p(100)));
     assert_eq!(
-        book.get_mut(p(100), Side::Buy).unwrap()[0].quantity(),
+        book.orders_at(p(100), Side::Buy)[0].quantity(),
         3
     );
     assert!(
@@ -99,12 +99,12 @@ fn sell_matches_best_bid() {
     let existing_order = Order::new(7, p(100), Side::Buy, 7).unwrap();
     let incoming_order = Order::new(8, p(99), Side::Sell, 3).unwrap();
 
-    book.add(existing_order);
+    book.add(existing_order).unwrap();
     matching_engine(incoming_order, &mut book, &mut trade_history, &mut 1, 0);
     let trade = trade_history.iter().next().unwrap();
 
     assert_eq!(
-        book.get_mut(p(100), Side::Buy).unwrap()[0].quantity(),
+        book.orders_at(p(100), Side::Buy)[0].quantity(),
         4
     );
     assert_eq!(trade_history.len(), 1);
@@ -124,8 +124,8 @@ fn buy_matches_multiple_price_levels() {
     let mut book = OrderBook::new();
     let mut trade_history = TradeHistory::new();
 
-    book.add(Order::new(9, p(99), Side::Sell, 3).unwrap());
-    book.add(Order::new(10, p(100), Side::Sell, 4).unwrap());
+    book.add(Order::new(9, p(99), Side::Sell, 3).unwrap()).unwrap();
+    book.add(Order::new(10, p(100), Side::Sell, 4).unwrap()).unwrap();
 
     let incoming = Order::new(11, p(101), Side::Buy, 6).unwrap();
     matching_engine(incoming, &mut book, &mut trade_history, &mut 1, 0);
@@ -142,7 +142,7 @@ fn buy_matches_multiple_price_levels() {
 
     assert_eq!(book.best_ask(), Some(p(100)));
     assert_eq!(
-        book.get_mut(p(100), Side::Sell).unwrap()[0].quantity(),
+        book.orders_at(p(100), Side::Sell)[0].quantity(),
         1
     );
     assert_eq!(book.best_bid(), None);
@@ -158,9 +158,9 @@ fn matches_orders_in_fifo_order_at_same_price() {
     let mut book = OrderBook::new();
     let mut trade_history = TradeHistory::new();
 
-    book.add(Order::new(12, p(100), Side::Sell, 3).unwrap());
+    book.add(Order::new(12, p(100), Side::Sell, 3).unwrap()).unwrap();
 
-    book.add(Order::new(13, p(100), Side::Sell, 5).unwrap());
+    book.add(Order::new(13, p(100), Side::Sell, 5).unwrap()).unwrap();
 
     let incoming = Order::new(14, p(100), Side::Buy, 3).unwrap();
 
@@ -172,7 +172,7 @@ fn matches_orders_in_fifo_order_at_same_price() {
     assert_eq!(trades[0].price(), p(100));
     assert_eq!(trades[0].quantity(), 3);
 
-    let remaining_orders = book.get_mut(p(100), Side::Sell).unwrap();
+    let remaining_orders = book.orders_at(p(100), Side::Sell);
 
     assert_eq!(remaining_orders.len(), 1);
     assert_eq!(remaining_orders[0].quantity(), 5);

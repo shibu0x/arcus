@@ -1,4 +1,8 @@
-use crate::{error::OrderError, price::Price};
+use crate::{
+    error::OrderError,
+    pool::{NIL, Slot},
+    price::Price,
+};
 
 pub type OrderId =  u64;
 
@@ -14,6 +18,8 @@ pub struct Order {
     price: Price,
     side: Side,
     quantity: u32,
+    pub(crate) prev: Slot,
+    pub(crate) next: Slot,
 }
 
 impl Order {
@@ -32,6 +38,8 @@ impl Order {
             price,
             side,
             quantity,
+            prev: NIL,
+            next: NIL,
         })
     }
     
