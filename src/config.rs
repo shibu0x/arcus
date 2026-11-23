@@ -1,5 +1,6 @@
 use crate::{
     error::{ConfigError, OrderError},
+    order_book::DEFAULT_CHUNK_BITS,
     price::Price,
 };
 
@@ -9,6 +10,9 @@ pub struct Config {
     tick_size: Price,
     min_price: Price,
     max_price: Price,
+    chunk_bits: u32,
+    max_chunks: Option<usize>,
+    expected_orders: usize,
 }
 
 impl Config {
@@ -19,7 +23,40 @@ impl Config {
         if min_price == 0 || min_price > max_price {
             return Err(ConfigError::InvalidRange { min: min_price, max: max_price });
         }
-        Ok(Self { tick_size, min_price, max_price })
+        Ok(Self {
+            tick_size,
+            min_price,
+            max_price,
+            chunk_bits: DEFAULT_CHUNK_BITS,
+            max_chunks: None,
+            expected_orders: 0,
+        })
+    }
+
+    pub fn with_pool(mut self, chunk_bits: u32, max_chunks: Option<usize>) -> Result<Self, ConfigError> {
+        if !(1..=24).contains(&chunk_bits) {
+            return Err(ConfigError::InvalidChunkBits(chunk_bits));
+        }
+        self.chunk_bits = chunk_bits;
+        self.max_chunks = max_chunks;
+        Ok(self)
+    }
+
+    pub fn with_expected_orders(mut self, expected_orders: usize) -> Self {
+        self.expected_orders = expected_orders;
+        self
+    }
+
+    pub(crate) fn expected_orders(&self) -> usize {
+        self.expected_orders
+    }
+
+    pub(crate) fn chunk_bits(&self) -> u32 {
+        self.chunk_bits
+    }
+
+    pub(crate) fn max_chunks(&self) -> Option<usize> {
+        self.max_chunks
     }
 
     pub(crate) fn check_price(&self, price: Price) -> Result<(), OrderError> {

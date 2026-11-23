@@ -103,3 +103,24 @@ fn cancelled_order_no_longer_trades() {
     assert_eq!(engine.trades().len(), 1);
     assert!(engine.book().validate().is_ok());
 }
+
+#[test]
+fn full_book_rejects_without_consuming_an_id_and_recovers_after_cancel() {
+    let config = Config::new(1, 1, u64::MAX).unwrap().with_pool(1, Some(1)).unwrap();
+    let mut engine = Engine::new(config);
+
+    let first = engine.submit_limit_order(100, Side::Sell, 5, 0).unwrap();
+    engine.submit_limit_order(101, Side::Sell, 5, 0).unwrap();
+
+    assert_eq!(engine.submit_limit_order(102, Side::Sell, 5, 0), Err(OrderError::BookFull));
+    engine.cancel_order(first).unwrap();
+    assert_eq!(engine.submit_limit_order(102, Side::Sell, 5, 0), Ok(3));
+    assert!(engine.book().validate().is_ok());
+}
+
+#[test]
+fn bad_pool_settings_are_rejected() {
+    let config = Config::new(1, 1, 10).unwrap();
+    assert_eq!(config.with_pool(0, None), Err(ConfigError::InvalidChunkBits(0)));
+    assert_eq!(config.with_pool(25, None), Err(ConfigError::InvalidChunkBits(25)));
+}

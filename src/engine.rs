@@ -18,9 +18,11 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(config: Config) -> Self {
+        let mut book = OrderBook::with_pool(config.chunk_bits(), config.max_chunks());
+        book.reserve(config.expected_orders());
         Self {
             config,
-            book: OrderBook::new(),
+            book,
             trades: TradeHistory::new(),
             next_order_id: 1,
             next_trade_id: 1,

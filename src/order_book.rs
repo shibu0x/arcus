@@ -32,7 +32,7 @@ impl Hasher for IdHasher {
 
 type IdMap = HashMap<OrderId, Slot, BuildHasherDefault<IdHasher>>;
 
-const DEFAULT_CHUNK_BITS: u32 = 16; // 65,536 slots per pool chunk
+pub(crate) const DEFAULT_CHUNK_BITS: u32 = 16;
 
 /// What one fill took from the oldest resting order at a level.
 pub(crate) struct Fill {
@@ -47,9 +47,19 @@ pub struct OrderBook {
     index: IdMap,
     bids: BTreeMap<Price, Level>,
     asks: BTreeMap<Price, Level>,
+    best_bid: Option<Price>,
+    best_ask: Option<Price>,
+}
+
+fn tree_best(levels: &BTreeMap<Price, Level>, side: Side) -> Option<Price> {
+    match side {
+        Side::Buy => levels.keys().next_back().copied(),
+        Side::Sell => levels.keys().next().copied(),
+    }
 }
 
 impl OrderBook {
+    #[cfg(test)]
     pub(crate) fn new() -> Self {
         Self::with_pool(DEFAULT_CHUNK_BITS, None)
     }
@@ -60,7 +70,13 @@ impl OrderBook {
             index: IdMap::default(),
             bids: BTreeMap::new(),
             asks: BTreeMap::new(),
+            best_bid: None,
+            best_ask: None,
         }
+    }
+
+    pub(crate) fn reserve(&mut self, expected_orders: usize) {
+        self.index.reserve(expected_orders);
     }
 
     /// True if another order can rest. Matching only frees slots, so checking
@@ -81,6 +97,12 @@ impl OrderBook {
             Side::Sell => &mut self.asks,
         };
         levels.entry(price).or_insert_with(Level::new).push_back(&mut self.pool, slot);
+
+        match side {
+            Side::Buy if self.best_bid.is_none_or(|best| price > best) => self.best_bid = Some(price),
+            Side::Sell if self.best_ask.is_none_or(|best| price < best) => self.best_ask = Some(price),
+            _ => {}
+        }
         Ok(())
     }
 
@@ -105,6 +127,11 @@ impl OrderBook {
         }
         if level.is_empty() {
             levels.remove(&price);
+            let best = tree_best(levels, side);
+            match side {
+                Side::Buy => self.best_bid = best,
+                Side::Sell => self.best_ask = best,
+            }
         }
         Fill { maker_id, quantity }
     }
@@ -124,16 +151,30 @@ impl OrderBook {
         level.unlink(&mut self.pool, slot);
         if level.is_empty() {
             levels.remove(&price);
+            let cached = match side {
+                Side::Buy => &mut self.best_bid,
+                Side::Sell => &mut self.best_ask,
+            };
+            if *cached == Some(price) {
+                *cached = tree_best(levels, side);
+            }
         }
         self.pool.remove(slot)
     }
 
+    pub fn depth(&self, side: Side) -> Vec<(Price, u64)> {
+        match side {
+            Side::Buy => self.bids.iter().rev().map(|(&p, l)| (p, l.total_qty())).collect(),
+            Side::Sell => self.asks.iter().map(|(&p, l)| (p, l.total_qty())).collect(),
+        }
+    }
+
     pub fn best_bid(&self) -> Option<Price> {
-        self.bids.keys().next_back().copied()
+        self.best_bid
     }
 
     pub fn best_ask(&self) -> Option<Price> {
-        self.asks.keys().next().copied()
+        self.best_ask
     }
 
     /// Resting orders at `price`, oldest first.
@@ -152,6 +193,12 @@ impl OrderBook {
         let resting = self.validate_side(Side::Buy)? + self.validate_side(Side::Sell)?;
         if resting != self.pool.len() {
             return Err(BookError::PoolMismatch { resting, in_pool: self.pool.len() });
+        }
+        if self.best_bid != tree_best(&self.bids, Side::Buy) {
+            return Err(BookError::BestMismatch { side: Side::Buy });
+        }
+        if self.best_ask != tree_best(&self.asks, Side::Sell) {
+            return Err(BookError::BestMismatch { side: Side::Sell });
         }
         if resting != self.index.len() {
             return Err(BookError::IndexSizeMismatch { indexed: self.index.len(), resting });

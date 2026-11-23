@@ -5,3 +5,7 @@ edition = "2024"
 
 [dependencies]
 thiserror = "2.0.21"
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"

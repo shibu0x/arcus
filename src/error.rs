@@ -26,6 +26,9 @@ pub enum ConfigError {
 
     #[error("price range {min}..={max} is invalid (min must be > 0 and <= max)")]
     InvalidRange { min: Price, max: Price },
+
+    #[error("chunk bits {0} must be in 1..=24")]
+    InvalidChunkBits(u32),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -44,6 +47,9 @@ pub enum BookError {
 
     #[error("crossed book: best bid {best_bid} >= best ask {best_ask}")]
     CrossedBook { best_bid: Price, best_ask: Price },
+
+    #[error("cached best {side:?} price does not match the levels")]
+    BestMismatch { side: Side },
 
     #[error("{side:?} level at price {price} points at dead slot {slot}")]
     DeadSlot { side: Side, price: Price, slot: Slot },
