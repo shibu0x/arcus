@@ -1,25 +1,36 @@
 use crate::{
     order::{Order, Side},
     order_book::OrderBook,
-    trade::{Trade, TradeHistory},
+    trade::{Timestamp, Trade, TradeHistory, TradeId},
 };
 
+/// Matches `order` against the book, then rests any remainder. The caller must
+/// have checked `orderbook.has_room()`: matching only frees slots, so the
+/// remainder always fits.
 pub fn matching_engine(
     mut order: Order,
     orderbook: &mut OrderBook,
     trade_history: &mut TradeHistory,
+    next_trade_id: &mut TradeId,
+    timestamp: Timestamp,
 ) {
     match order.side() {
-        Side::Buy => match_buy(&mut order, orderbook, trade_history),
-        Side::Sell => match_sell(&mut order, orderbook, trade_history),
+        Side::Buy => match_buy(&mut order, orderbook, trade_history, next_trade_id, timestamp),
+        Side::Sell => match_sell(&mut order, orderbook, trade_history, next_trade_id, timestamp),
     }
 
     if order.quantity() > 0 {
-        orderbook.add(order);
+        orderbook.add(order).expect("room was checked before matching");
     }
 }
 
-pub fn match_buy(order: &mut Order, orderbook: &mut OrderBook, trade_history: &mut TradeHistory) {
+pub fn match_buy(
+    order: &mut Order,
+    orderbook: &mut OrderBook,
+    trade_history: &mut TradeHistory,
+    next_trade_id: &mut TradeId,
+    timestamp: Timestamp,
+) {
     while order.quantity() > 0 {
         let Some(best_ask) = orderbook.best_ask() else {
             break;
@@ -29,32 +40,29 @@ pub fn match_buy(order: &mut Order, orderbook: &mut OrderBook, trade_history: &m
             break;
         }
 
-        if let Some(orders) = orderbook.get_mut(best_ask, Side::Sell) {
-            if let Some(resting_order) = orders.first_mut() {
-                let traded = order.quantity().min(resting_order.quantity());
+        let fill = orderbook.fill_front(Side::Sell, best_ask, order.quantity());
+        order.reduce_quantity(fill.quantity);
 
-                order.reduce_quantity(traded);
-                resting_order.reduce_quantity(traded);
-
-                let trade = Trade::new(best_ask, traded, order.side());
-
-                trade_history.add(trade);
-            }
-
-            if orders.first().is_some_and(|o| o.quantity() == 0) {
-                orders.remove(0);
-            }
-            if orders.is_empty() {
-                orderbook.remove(best_ask, Side::Sell);
-            }
-        } else {
-            orderbook.remove(best_ask, Side::Sell);
-            continue;
-        }
+        trade_history.add(Trade::new(
+            *next_trade_id,
+            best_ask,
+            fill.quantity,
+            order.side(),
+            fill.maker_id,
+            order.id(),
+            timestamp,
+        ));
+        *next_trade_id += 1;
     }
 }
 
-pub fn match_sell(order: &mut Order, orderbook: &mut OrderBook, trade_history: &mut TradeHistory) {
+pub fn match_sell(
+    order: &mut Order,
+    orderbook: &mut OrderBook,
+    trade_history: &mut TradeHistory,
+    next_trade_id: &mut TradeId,
+    timestamp: Timestamp,
+) {
     while order.quantity() > 0 {
         let Some(best_bid) = orderbook.best_bid() else {
             break;
@@ -64,28 +72,21 @@ pub fn match_sell(order: &mut Order, orderbook: &mut OrderBook, trade_history: &
             break;
         }
 
-        if let Some(orders) = orderbook.get_mut(best_bid, Side::Buy) {
-            if let Some(resting_order) = orders.first_mut() {
-                let traded = order.quantity().min(resting_order.quantity());
+        let fill = orderbook.fill_front(Side::Buy, best_bid, order.quantity());
+        order.reduce_quantity(fill.quantity);
 
-                order.reduce_quantity(traded);
-                resting_order.reduce_quantity(traded);
-
-                let trade = Trade::new(best_bid, traded, order.side());
-
-                trade_history.add(trade);
-            }
-
-            if orders.first().is_some_and(|o| o.quantity() == 0) {
-                orders.remove(0);
-            }
-
-            if orders.is_empty() {
-                orderbook.remove(best_bid, Side::Buy);
-            }
-        } else {
-            orderbook.remove(best_bid, Side::Buy);
-            continue;
-        }
+        trade_history.add(Trade::new(
+            *next_trade_id,
+            best_bid,
+            fill.quantity,
+            order.side(),
+            fill.maker_id,
+            order.id(),
+            timestamp,
+        ));
+        *next_trade_id += 1;
     }
 }
+
+#[cfg(test)]
+mod tests;

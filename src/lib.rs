@@ -1,5 +1,10 @@
-pub mod matching;
+pub mod config;
+pub mod error;
+pub mod engine;
+pub(crate) mod level;
+pub(crate) mod matching;
 pub mod order;
 pub mod order_book;
+pub(crate) mod pool;
 pub mod price;
 pub mod trade;
